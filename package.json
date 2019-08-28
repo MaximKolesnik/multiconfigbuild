@@ -1,7 +1,9 @@
 {
 	"name": "multiconfigbuild",
+	"publisher": "MaximKolesnik",
 	"displayName": "MultiConfigurationBuild",
 	"description": "Provide ability to manage multiple configurations of a source tree",
+	"repository": "https://github.com/MaximKolesnik/multiconfigbuild",
 	"version": "0.0.1",
 	"engines": {
 		"vscode": "^1.36.0"
@@ -10,14 +12,53 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.helloWorld"
+		"*"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "extension.helloWorld",
-				"title": "Hello World"
+				"command": "extension.multiConfigurationBuild",
+				"title": "Multiple Configurations Build",
+				"category": "MultiConfigurationBuild"
+			},
+			{
+				"command": "extension.build",
+				"title": "Build",
+				"category": "MultiConfigurationBuild"
+			},
+			{
+				"command": "extension.debug",
+				"title": "Debug",
+				"category": "MultiConfigurationBuild"
+			},
+			{
+				"command": "extension.run",
+				"title": "Run",
+				"category": "MultiConfigurationBuild"
+			},
+			{
+				"command": "extension.buildCurrentFile",
+				"title": "Build Current File",
+				"category": "MultiConfigurationBuild"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "extension.multiConfigurationBuild",
+				"key": "ctrl+shift+m"
+			},
+			{
+				"command": "extension.buildAndDebug",
+				"key": "ctrl+shift+d"
+			},
+			{
+				"command": "extension.run",
+				"key": "ctrl+shift+r"
+			},
+			{
+				"command": "extension.buildCurrentFile",
+				"key": "ctrl+shift+b"
 			}
 		]
 	},
