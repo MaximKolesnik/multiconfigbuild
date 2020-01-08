@@ -1,12 +1,45 @@
 import { ConfigOption } from './ConfigOption'
-import { Deserializable } from './Deserializable';
 
-export class ConfigType implements Deserializable<ConfigType>
+export class ConfigType
 {
-	constructor()
+	constructor(
+		private _name: string = "undefined",
+		private _options: Array<ConfigOption> = new Array(new ConfigOption))
 	{
-		this._name = "undefined";
-		this._options = new Array(new ConfigOption);
+	}
+
+	toJSON()
+	{
+		var obj = 
+			{
+				name: this._name,
+				options: this._options
+			};
+		
+		return obj;
+	}
+
+	static fromJSON(json: ConfigTypeJSON) : ConfigType
+	{
+		let instance = Object.create(ConfigType.prototype);
+		let options = new Array;
+
+		for (let val of json.options)
+		{
+			options.push(ConfigOption.fromJSON(val));
+		}
+
+		instance = Object.assign(instance, {},
+			{
+				_name: json.name,
+				_options: options
+			});
+
+		return instance;
+	}
+
+	static reviver(key: string, value: any): any {
+		return key === "" ? ConfigType.fromJSON(value) : value;
 	}
 
 	get name()
@@ -18,21 +51,10 @@ export class ConfigType implements Deserializable<ConfigType>
 	{
 		return this._options;
 	}
+}
 
-	deserialize(input: Object)
-	{
-		this._options = new Array;
-
-		let entries = new Map(Object.entries(input));
-		this._name = entries.get('_name');
-		for (let option of entries.get('_options'))
-		{
-			var newConfOption = new ConfigOption;
-			newConfOption.deserialize(option);
-			this._options.push(newConfOption);
-		}
-	}
-
-	private _name: string
-	private _options: ConfigOption[];
+interface ConfigTypeJSON
+{
+	name: string;
+	options: Array<ConfigOption>;
 }

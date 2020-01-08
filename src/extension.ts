@@ -10,12 +10,6 @@ var mcbController:MultiConfigurationBuild | null;
 export function activate(context: vscode.ExtensionContext)
 {
 	mcbController = new MultiConfigurationBuild(context);
-
-	vscode.window.showInformationMessage('Activated');
-	let statusBarItem = vscode.window.
-		createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-	statusBarItem.text = "Test";
-	statusBarItem.show();
 }
 
 // this method is called when your extension is deactivated

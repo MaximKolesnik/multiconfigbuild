@@ -2,9 +2,9 @@
 	"name": "multiconfigbuild",
 	"publisher": "MaximKolesnik",
 	"displayName": "MultiConfigurationBuild",
-	"description": "Provide ability to manage multiple configurations of a source tree",
+	"description": "Provides ability to manage multiple configurations of a source tree",
 	"repository": "https://github.com/MaximKolesnik/multiconfigbuild",
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"engines": {
 		"vscode": "^1.36.0"
 	},
@@ -18,47 +18,56 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "extension.multiConfigurationBuild",
+				"command": "multiConfigBuild.multiConfigurationBuild",
 				"title": "Multiple Configurations Build",
 				"category": "MultiConfigurationBuild"
 			},
 			{
-				"command": "extension.build",
+				"command": "multiConfigBuild.build",
 				"title": "Build",
 				"category": "MultiConfigurationBuild"
 			},
 			{
-				"command": "extension.debug",
+				"command": "multiConfigBuild.debug",
 				"title": "Debug",
 				"category": "MultiConfigurationBuild"
 			},
 			{
-				"command": "extension.run",
+				"command": "multiConfigBuild.run",
 				"title": "Run",
 				"category": "MultiConfigurationBuild"
 			},
 			{
-				"command": "extension.buildCurrentFile",
+				"command": "multiConfigBuild.buildCurrentFile",
 				"title": "Build Current File",
+				"category": "MultiConfigurationBuild"
+			},
+			{
+				"command": "multiConfigBuild.clean",
+				"title": "Clean",
 				"category": "MultiConfigurationBuild"
 			}
 		],
 		"keybindings": [
 			{
-				"command": "extension.multiConfigurationBuild",
-				"key": "ctrl+shift+m"
+				"command": "multiConfigBuild.build",
+				"key": "ctrl+shift+b"
 			},
 			{
-				"command": "extension.buildAndDebug",
+				"command": "multiConfigBuild.debug",
 				"key": "ctrl+shift+d"
 			},
 			{
-				"command": "extension.run",
+				"command": "multiConfigBuild.run",
 				"key": "ctrl+shift+r"
 			},
 			{
-				"command": "extension.buildCurrentFile",
-				"key": "ctrl+shift+b"
+				"command": "multiConfigBuild.buildCurrentFile",
+				"key": "ctrl+shift+f7"
+			},
+			{
+				"command": "multiConfigBuild.clean",
+				"key": "ctrl+shift+f9"
 			}
 		]
 	},

@@ -1,65 +1,123 @@
 # multiconfigbuild README
 
-This is the README for your extension "multiconfigbuild". After writing up a brief description, we recommend including the following sections.
+MultiConfigBuild(MCB) provides an ability to customize/switch your build chain on the fly
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+With the help of MCB you can issue build, buildCurrentFile, debug, run commands. When workspace is opened, Multi Configuration Build command must be issued to initialize the extension. This will create mcb.config.json file the user need to modify in order to customized build, buildCurrentFile, debug, run and clean commands.
 
-For example if there is an image subfolder under your extension project workspace:
+```
+{
+	"version": "1.0.0",
+	"configTypes": [
+		{
+			"name": "undefined",
+			"options": [
+				{
+					"name": "default",
+					"flags": "your flags"
+				}
+			]
+		}
+	],
+	"buildCommands": [
+		{
+			"commandType": "build",
+			"command": ""
+		},
+		{
+			"commandType": "buildCurrentFile",
+			"command": ""
+		},
+		{
+			"commandType": "debug",
+			"command": ""
+		},
+		{
+			"commandType": "run",
+			"command": ""
+		},
+		{
+			"commandType": "clean",
+			"command": ""
+		}
+	]
+}
+```
 
-\!\[feature X\]\(images/feature-x.png\)
+In the config file the user should replace initial configType entry, for example, with Optimization.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+```
+"configTypes": [
+	{
+		"name": "Optimization",
+		"options": [
+			{
+				"name": "Debug",
+				"flags": "-g"
+			},
+			{
+				"name": "Release",
+				"flags": "-O2"
+			}
+		]
+	}
+]
+```
+
+This will create MCB Optimization button in the status bar, which when clicked opens quick pick to choose options. Flags can be provided for each options to be inserted to the command.
+
+In the build command configTypes must be inserted in the command starting with $mcb{ and ending with }$
+
+Note that there is built in parameter currentFile. which is the path for active file relative to your worspace directory
+
+```
+"buildCommands": [
+{
+	"commandType": "build",
+	"command": "clang++ $mcb{Optimization}$"
+}
+```
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+* At this time extension only works with workspaces
+* The extension does not do any additional work under the hood to enhance build chain. For example, when run command is issued, the extension does not check if the executable is actually built. If the user requires such functionality he has to consider incorporating it into the command
+* Reserved name: $mcb{currentFile}$
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+MCB contributes following commands:
 
-For example:
+* `multiConfigBuild.multiConfigurationBuild`: initialize extension
+* `multiConfigBuild.build`
+* `multiConfigBuild.debug`
+* `multiConfigBuild.run`
+* `multiConfigBuild.buildCurrentFile`
+* `multiConfigBuild.clean`
 
-This extension contributes the following settings:
+By default MCB contributes following keybindings:
 
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+* `multiConfigBuild.build`: 					 `ctrl+shift+b`
+* `multiConfigBuild.debug`: 					 `ctrl+shift+d`
+* `multiConfigBuild.run`: 						 `ctrl+shift+r`
+* `multiConfigBuild.buildCurrentFile`: `ctrl+shift+f7`
+* `multiConfigBuild.clean`:						 `ctrl+shift+f9`
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+Right now buildCurrentFile command works only with .c and .cpp file. As the extension was developed mainly for c/c++, it is not clear if this functionality has any uses in other languages. This can be fixed if there is any need.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ### 1.0.0
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Initial release of MCB
 
 -----------------------------------------------------------------------------------------------------------
 
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (macOS) to see a list of Markdown snippets
-
 ### For more information
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+Visit https://github.com/MaximKolesnik/multiconfigbuild
 
 **Enjoy!**

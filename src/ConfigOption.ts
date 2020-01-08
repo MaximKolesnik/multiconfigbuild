@@ -1,11 +1,36 @@
-import { Deserializable } from './Deserializable';
-
-export class ConfigOption implements Deserializable<ConfigOption>
+export class ConfigOption
 {
-	constructor()
+	constructor(
+		private _name: string = "default",
+		private _flags: string = "your flags")
 	{
-		this._name = "default";
-		this._flags = "your flags";
+	}
+
+	toJSON()
+	{
+		var obj = 
+			{
+				name: this._name,
+				flags: this._flags
+			};
+		
+		return obj;
+	}
+
+	static fromJSON(json: ConfigOptionJSON) : ConfigOption
+	{
+		let instance = Object.create(ConfigOption.prototype);
+		instance = Object.assign(instance, {},
+			{
+				_name: json.name,
+				_flags: json.flags
+			});
+
+		return instance;
+	}
+
+	static reviver(key: string, value: any): any {
+		return key === "" ? ConfigOption.fromJSON(value) : value;
 	}
 
 	get name()
@@ -17,15 +42,10 @@ export class ConfigOption implements Deserializable<ConfigOption>
 	{
 		return this._flags;
 	}
+}
 
-	deserialize(input: Object)
-	{
-		let entries = new Map(Object.entries(input));
-
-		this._name = entries.get('_name');
-		this._name = entries.get('_flags');
-	}
-
-	private _name: string;
-	private _flags: string;
+interface ConfigOptionJSON
+{
+	name: string;
+	flags: string;
 }

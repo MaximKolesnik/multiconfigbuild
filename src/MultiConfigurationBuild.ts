@@ -1,25 +1,25 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as lodash from 'lodash';
-import { stringify } from 'querystring';
 import { MCBConfig } from './MCBConfig';
-import { ConfigBuilder } from './ConfigBuilder'
+import { BuildCommand } from './BuildCommand';
 
 export class MultiConfigurationBuild
 {
 	constructor(context: vscode.ExtensionContext)
 	{
 		this._context = context;
-		this._mainCommandID = 'extension.multiConfigurationBuild';
-		this._buildCommandID = 'extension.build';
-		this._buildCurrentFileCommandID = 'extension.buildCurrentFile';
-		this._debugCommandID = 'extension.debug';
-		this._runCommandID = 'extension.run';
+		this._mainCommandID = 'multiConfigBuild.multiConfigurationBuild';
+		this._buildCommandID = 'multiConfigBuild.build';
+		this._buildCurrentFileCommandID = 'multiConfigBuild.buildCurrentFile';
+		this._debugCommandID = 'multiConfigBuild.debug';
+		this._runCommandID = 'multiConfigBuild.run';
+		this._cleanCommandID = 'multiConfigBuild.clean';
 		this._configWatcher = undefined;
-		this._config = new MCBConfig;
-		this._configBuilder = new ConfigBuilder(context);
-
+		this._config = new MCBConfig(context);
+		this._context = context;
+		this._statusBarItems = new Map;
+		this._statusBarCommands = new Array;
 		this.tryInitialize();
 	}
 
@@ -36,7 +36,7 @@ export class MultiConfigurationBuild
 
 			if (fs.existsSync(configPath))
 			{
-				this.readConfig();
+				this.prepareConfig();
 				this.initFileWatcher();
 				this._initialized = true;
 			}
@@ -61,22 +61,27 @@ export class MultiConfigurationBuild
 		disposables.push(vscode.commands.registerCommand(this._buildCommandID,
 			() =>
 			{
-				vscode.window.showInformationMessage('Build Command');
+				this.commandCallback('build', 'Build');
 			}));
 		disposables.push(vscode.commands.registerCommand(this._buildCurrentFileCommandID,
 			() =>
 			{
-				vscode.window.showInformationMessage('Build Current Command');
+				this.commandCallback('buildCurrentFile', 'Build Current File');
 			}));
 		disposables.push(vscode.commands.registerCommand(this._debugCommandID,
 			() =>
 			{
-				vscode.window.showInformationMessage('Debug Command');
+				this.commandCallback('debug', 'Debug');
 			}));
 		disposables.push(vscode.commands.registerCommand(this._runCommandID,
 			() =>
 			{
-				vscode.window.showInformationMessage('Run Command');
+				this.commandCallback('run', 'Run');
+			}));
+		disposables.push(vscode.commands.registerCommand(this._cleanCommandID,
+			() =>
+			{
+				this.commandCallback('clean', 'Clean');
 			}));
 
 		disposables.forEach((entry) =>
@@ -139,7 +144,7 @@ export class MultiConfigurationBuild
 			this._initialized = true;
 		}
 		
-		this.readConfig();
+		this.prepareConfig();
 		vscode.workspace.openTextDocument(configPath).then(doc => {
 			vscode.window.showTextDocument(doc);
 		});
@@ -164,7 +169,7 @@ export class MultiConfigurationBuild
 
 	private onConfigFileChangedCallback()
 	{
-		this.readConfig();
+		this.prepareConfig();
 		vscode.window.showInformationMessage('MCB config was changed. Build commands were rebuilt!');
 	}
 
@@ -180,14 +185,267 @@ export class MultiConfigurationBuild
 		{
 			this._configWatcher.dispose();
 		}
-		this._configBuilder.destroy();
+		this.destroyConfigSelection();
 		this._initialized = false;
 	}
 
-	private readConfig()
+	private prepareConfig()
 	{
-		this._config.deserialize(JSON.parse(fs.readFileSync(this.getConfigPath(), 'utf8')));
-		this._configBuilder.rebuild(this._config);
+		this._config = JSON.parse(
+			fs.readFileSync(this.getConfigPath(), 'utf8'),
+			MCBConfig.reviver);
+		this._config.prepareHistory();
+		this.prepareConfigSelection();
+	}
+
+	private parseCommand(command: string)
+	{
+		const openingSym = '$mcb{';
+		const openingLength = openingSym.length;
+		const closingSym = '}$';
+		const closingLength = closingSym.length;
+
+		var currIndex = 0;
+		var parsedCommand = '';
+
+		let history = this._config.history;
+		let configTypes = this._config.configTypes;
+
+		if (!history)
+		{
+			throw "History is not initialized";
+		}
+
+		while (true)
+		{
+			let nextIndex =	command.indexOf(openingSym, currIndex);
+			if (nextIndex == -1)
+			{
+				if (parsedCommand.length == 0 && command.length != 0)
+				{
+					parsedCommand = command;
+				}
+
+				break;
+			}
+
+			var t = command.substring(currIndex, nextIndex == -1 ? command.length : nextIndex);
+			parsedCommand += t;
+
+			let closingIndex = command.indexOf(closingSym, nextIndex);
+
+			{
+				let sanityCheck = command.indexOf(openingSym, nextIndex + 1);
+				if (closingIndex == -1 || (sanityCheck != -1 && sanityCheck < closingIndex))
+				{
+					throw "Parser failed";
+				}
+			}
+
+			var configName = command.substring(nextIndex + openingLength, closingIndex);
+
+			// special case
+			if (configName)
+			{
+				if (!vscode.window.activeTextEditor
+					|| vscode.workspace.workspaceFolders == undefined)
+				{
+					throw 'Cannot resolve current file path';
+				}
+
+				const filePath = vscode.window.activeTextEditor.document.fileName;
+				const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+				parsedCommand += path.relative(workspacePath, filePath);
+			}
+			else
+			{
+				var configType = configTypes.find((elem) => elem.name == configName);
+
+				if (!configType)
+				{
+					throw 'Unrecognized config ' + configName;
+				}
+
+				var lastOptionName = history.getLastOptionOfType(configName);
+				var option = configType.options.find(
+					(elem) => elem.name == lastOptionName);
+
+				if (!option)
+				{
+					throw 'Uncrecognized option of ' + configName;
+				}
+
+				parsedCommand += option.flags;
+			}
+
+			currIndex = closingIndex + closingLength;
+		}
+
+		return parsedCommand;
+	}
+
+	private commandCallback(commandType: string, text: string)
+	{
+		let pred = (element: BuildCommand) => element.commandType == commandType;
+		var command = this._config.buildCommands.find(pred);
+		if (!command)
+		{
+			vscode.window.showErrorMessage(text + ' command failed to run');
+			return;
+		}
+
+		this.createTerminal();
+
+		if (!this._terminal)
+		{
+			vscode.window.showErrorMessage(text
+				+ ' command failed to run. Terminal is not initialized');
+			return;
+		}
+
+		try
+		{
+			vscode.workspace.saveAll(false);
+
+			if (command.commandType == "buildCurrentFile")
+			{
+				if (!this.validateBuildCurrentFileState())
+				{
+					return;
+				}
+			}
+
+			this._terminal.show(true);
+			this._terminal.sendText(this.parseCommand(command.command));
+		}
+		catch(e)
+		{
+			vscode.window.showErrorMessage('Failed to parse command. ' + e);
+		}
+	}
+
+	private prepareConfigSelection()
+	{
+		let history = this._config.history;
+		let configTypes = this._config.configTypes;
+
+		this.destroyConfigSelection();
+
+		configTypes.forEach(elem =>
+			{
+				var item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+				var commandId = elem.name + 'FlagPicker';
+				let options: string[] = [];
+
+				if (!history)
+				{
+					vscode.window.showErrorMessage("History is not initialized");
+					return;
+				}
+
+				elem.options.forEach(option =>
+					{
+						options.push(option.name);
+					});
+
+				var commandDisp = vscode.commands.registerCommand(commandId, async () =>
+				{
+					if (!history)
+					{
+						vscode.window.showErrorMessage("History is not initialized");
+						return;
+					}
+
+					const selection = await vscode.window.showQuickPick(
+						options, {placeHolder: 'Select Option', canPickMany: false});
+
+					if (selection)
+					{
+						var statusBarItem = this._statusBarItems.get(commandId);
+						if (statusBarItem)
+						{
+							var configType = configTypes.find(
+								(element) => element.name == elem.name);
+
+							if (!configType)
+							{
+								vscode.window.showErrorMessage(
+									'Cannot find config type' + elem.name);
+								return;
+							}
+
+							var option = configType.options.find(
+								(element) => element.name == selection);
+
+							if (!option)
+							{
+								vscode.window.showErrorMessage(
+									'Cannot find option' + elem.name);
+								return;
+							}
+
+							history.setLastOptionOfType(configType.name, option.name);
+							history.save();
+							statusBarItem.text = 'MCB ' + elem.name + ' : ' + selection;
+						}
+					}
+				});
+
+				this._statusBarCommands.push(commandDisp);
+				item.command = commandId;
+				item.text = 'MCB ' + elem.name + ' : ' + history.getLastOptionOfType(elem.name);
+				item.show();
+				this._statusBarItems.set(commandId, item);
+				this._context.subscriptions.push(item);
+			});
+	}
+
+	private destroyConfigSelection()
+	{
+		this._statusBarItems.forEach(element => {
+			element.dispose();
+		});
+		this._statusBarItems = new Map;
+		this._statusBarCommands.forEach(value => {
+			value.dispose();
+		});
+		this._statusBarCommands = new Array;
+	}
+
+	private createTerminal()
+	{
+		if (this._terminal)
+		{
+			this._terminal.dispose();
+		}
+		this._terminal = vscode.window.createTerminal('MCB terminal');
+	}
+
+	private validateBuildCurrentFileState()
+	{
+		if (!vscode.window.activeTextEditor)
+		{
+			vscode.window.showErrorMessage("No active text editor");
+			return false;
+		}
+
+		if (!vscode.workspace || !vscode.workspace.rootPath)
+		{
+			vscode.window.showErrorMessage("Workspace is not valid");
+			return false;
+		}
+		
+		const filePath = vscode.window.activeTextEditor.document.fileName;
+		const extension = path.extname(filePath);
+
+		if (extension != ".cpp" && extension != ".c")
+		{
+			vscode.window.showErrorMessage(
+				"Cannot compile files with extension " + extension);
+			return false;
+		}
+
+		return true;
 	}
 
 	private _context: vscode.ExtensionContext;
@@ -197,7 +455,10 @@ export class MultiConfigurationBuild
 	private readonly _buildCurrentFileCommandID: string;
 	private readonly _debugCommandID: string;
 	private readonly _runCommandID: string;
+	private readonly _cleanCommandID: string;
 	private _configWatcher: vscode.FileSystemWatcher | undefined;
 	private _config: MCBConfig;
-	private _configBuilder: ConfigBuilder;
+	private _statusBarItems: Map<string, vscode.StatusBarItem>;
+	private _statusBarCommands: vscode.Disposable[];
+	private _terminal: vscode.Terminal | undefined;
 }
