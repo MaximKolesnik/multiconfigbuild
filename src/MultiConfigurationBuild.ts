@@ -245,7 +245,7 @@ export class MultiConfigurationBuild
 			var configName = command.substring(nextIndex + openingLength, closingIndex);
 
 			// special case
-			if (configName)
+			if (configName == "currentFile")
 			{
 				if (!vscode.window.activeTextEditor
 					|| vscode.workspace.workspaceFolders == undefined)
