@@ -51,7 +51,7 @@ export class MCBHistory
 	updateToNewConfig(configs: ConfigType[])
 	{
 		var length = this._configTypes.length - 1;
-		while (length > 0)
+		while (length >= 0)
 		{
 			var index = configs.findIndex(
 				(elem) => elem.name == this._configTypes[length].configType);
@@ -62,8 +62,6 @@ export class MCBHistory
 
 			--length;
 		}
-
-		for (let entry of this._configTypes)
 
 		for (let config of configs)
 		{

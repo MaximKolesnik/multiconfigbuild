@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { MCBConfig } from './MCBConfig';
-import { BuildCommand } from './BuildCommand';
 
 export class MultiConfigurationBuild
 {
@@ -10,11 +9,6 @@ export class MultiConfigurationBuild
 	{
 		this._context = context;
 		this._mainCommandID = 'multiConfigBuild.multiConfigurationBuild';
-		this._buildCommandID = 'multiConfigBuild.build';
-		this._buildCurrentFileCommandID = 'multiConfigBuild.buildCurrentFile';
-		this._debugCommandID = 'multiConfigBuild.debug';
-		this._runCommandID = 'multiConfigBuild.run';
-		this._cleanCommandID = 'multiConfigBuild.clean';
 		this._configWatcher = undefined;
 		this._config = new MCBConfig(context);
 		this._context = context;
@@ -57,31 +51,6 @@ export class MultiConfigurationBuild
 			() =>
 			{
 				this.mainCommandCallback();
-			}));
-		disposables.push(vscode.commands.registerCommand(this._buildCommandID,
-			() =>
-			{
-				this.commandCallback('build', 'Build');
-			}));
-		disposables.push(vscode.commands.registerCommand(this._buildCurrentFileCommandID,
-			() =>
-			{
-				this.commandCallback('buildCurrentFile', 'Build Current File');
-			}));
-		disposables.push(vscode.commands.registerCommand(this._debugCommandID,
-			() =>
-			{
-				this.commandCallback('debug', 'Debug');
-			}));
-		disposables.push(vscode.commands.registerCommand(this._runCommandID,
-			() =>
-			{
-				this.commandCallback('run', 'Run');
-			}));
-		disposables.push(vscode.commands.registerCommand(this._cleanCommandID,
-			() =>
-			{
-				this.commandCallback('clean', 'Clean');
 			}));
 
 		disposables.forEach((entry) =>
@@ -145,21 +114,24 @@ export class MultiConfigurationBuild
 		}
 		
 		this.prepareConfig();
-		vscode.workspace.openTextDocument(configPath).then(doc => {
-			vscode.window.showTextDocument(doc);
-		});
+		vscode.workspace.openTextDocument(configPath).then(doc =>
+			{
+				vscode.window.showTextDocument(doc);
+			});
 	}
 
 	private initFileWatcher()
 	{
 		this._configWatcher = vscode.workspace.createFileSystemWatcher(this.getConfigPath());
-		this._configWatcher.onDidChange((filename) => {
-			if (filename.fsPath === this.getConfigPath())
+		this._configWatcher.onDidChange((filename) =>
 			{
-				this.onConfigFileChangedCallback();
-			}
-		});
-		this._configWatcher.onDidDelete((filename) => {
+				if (filename.fsPath === this.getConfigPath())
+				{
+					this.onConfigFileChangedCallback();
+				}
+			});
+		this._configWatcher.onDidDelete((filename) =>
+		{
 			if (filename.fsPath === this.getConfigPath())
 			{
 				this.onConfigFileDeletedCallback();
@@ -186,142 +158,18 @@ export class MultiConfigurationBuild
 			this._configWatcher.dispose();
 		}
 		this.destroyConfigSelection();
+		this._config.cleanup();
 		this._initialized = false;
 	}
 
 	private prepareConfig()
 	{
+		this._config.cleanup();
 		this._config = JSON.parse(
 			fs.readFileSync(this.getConfigPath(), 'utf8'),
 			MCBConfig.reviver);
-		this._config.prepareHistory();
+		this._config.prepare(this._context);
 		this.prepareConfigSelection();
-	}
-
-	private parseCommand(command: string)
-	{
-		const openingSym = '$mcb{';
-		const openingLength = openingSym.length;
-		const closingSym = '}$';
-		const closingLength = closingSym.length;
-
-		var currIndex = 0;
-		var parsedCommand = '';
-
-		let history = this._config.history;
-		let configTypes = this._config.configTypes;
-
-		if (!history)
-		{
-			throw "History is not initialized";
-		}
-
-		while (true)
-		{
-			let nextIndex =	command.indexOf(openingSym, currIndex);
-			if (nextIndex == -1)
-			{
-				if (parsedCommand.length == 0 && command.length != 0)
-				{
-					parsedCommand = command;
-				}
-
-				break;
-			}
-
-			var t = command.substring(currIndex, nextIndex == -1 ? command.length : nextIndex);
-			parsedCommand += t;
-
-			let closingIndex = command.indexOf(closingSym, nextIndex);
-
-			{
-				let sanityCheck = command.indexOf(openingSym, nextIndex + 1);
-				if (closingIndex == -1 || (sanityCheck != -1 && sanityCheck < closingIndex))
-				{
-					throw "Parser failed";
-				}
-			}
-
-			var configName = command.substring(nextIndex + openingLength, closingIndex);
-
-			// special case
-			if (configName == "currentFile")
-			{
-				if (!vscode.window.activeTextEditor
-					|| vscode.workspace.workspaceFolders == undefined)
-				{
-					throw 'Cannot resolve current file path';
-				}
-
-				const filePath = vscode.window.activeTextEditor.document.fileName;
-				const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-				parsedCommand += path.relative(workspacePath, filePath);
-			}
-			else
-			{
-				var configType = configTypes.find((elem) => elem.name == configName);
-
-				if (!configType)
-				{
-					throw 'Unrecognized config ' + configName;
-				}
-
-				var lastOptionName = history.getLastOptionOfType(configName);
-				var option = configType.options.find(
-					(elem) => elem.name == lastOptionName);
-
-				if (!option)
-				{
-					throw 'Uncrecognized option of ' + configName;
-				}
-
-				parsedCommand += option.flags;
-			}
-
-			currIndex = closingIndex + closingLength;
-		}
-
-		return parsedCommand;
-	}
-
-	private commandCallback(commandType: string, text: string)
-	{
-		let pred = (element: BuildCommand) => element.commandType == commandType;
-		var command = this._config.buildCommands.find(pred);
-		if (!command)
-		{
-			vscode.window.showErrorMessage(text + ' command failed to run');
-			return;
-		}
-
-		this.createTerminal();
-
-		if (!this._terminal)
-		{
-			vscode.window.showErrorMessage(text
-				+ ' command failed to run. Terminal is not initialized');
-			return;
-		}
-
-		try
-		{
-			vscode.workspace.saveAll(false);
-
-			if (command.commandType == "buildCurrentFile")
-			{
-				if (!this.validateBuildCurrentFileState())
-				{
-					return;
-				}
-			}
-
-			this._terminal.show(true);
-			this._terminal.sendText(this.parseCommand(command.command));
-		}
-		catch(e)
-		{
-			vscode.window.showErrorMessage('Failed to parse command. ' + e);
-		}
 	}
 
 	private prepareConfigSelection()
@@ -412,53 +260,11 @@ export class MultiConfigurationBuild
 		this._statusBarCommands = new Array;
 	}
 
-	private createTerminal()
-	{
-		if (this._terminal)
-		{
-			this._terminal.dispose();
-		}
-		this._terminal = vscode.window.createTerminal('MCB terminal');
-	}
-
-	private validateBuildCurrentFileState()
-	{
-		if (!vscode.window.activeTextEditor)
-		{
-			vscode.window.showErrorMessage("No active text editor");
-			return false;
-		}
-
-		if (!vscode.workspace || !vscode.workspace.rootPath)
-		{
-			vscode.window.showErrorMessage("Workspace is not valid");
-			return false;
-		}
-		
-		const filePath = vscode.window.activeTextEditor.document.fileName;
-		const extension = path.extname(filePath);
-
-		if (extension != ".cpp" && extension != ".c")
-		{
-			vscode.window.showErrorMessage(
-				"Cannot compile files with extension " + extension);
-			return false;
-		}
-
-		return true;
-	}
-
 	private _context: vscode.ExtensionContext;
 	private _initialized = false;
 	private readonly _mainCommandID: string;
-	private readonly _buildCommandID: string;
-	private readonly _buildCurrentFileCommandID: string;
-	private readonly _debugCommandID: string;
-	private readonly _runCommandID: string;
-	private readonly _cleanCommandID: string;
 	private _configWatcher: vscode.FileSystemWatcher | undefined;
 	private _config: MCBConfig;
 	private _statusBarItems: Map<string, vscode.StatusBarItem>;
 	private _statusBarCommands: vscode.Disposable[];
-	private _terminal: vscode.Terminal | undefined;
 }

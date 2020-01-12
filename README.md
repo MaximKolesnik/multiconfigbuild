@@ -20,28 +20,20 @@ With the help of MCB you can issue build, buildCurrentFile, debug, run commands.
 			]
 		}
 	],
-	"buildCommands": [
-		{
-			"commandType": "build",
-			"command": ""
-		},
-		{
-			"commandType": "buildCurrentFile",
-			"command": ""
-		},
-		{
-			"commandType": "debug",
-			"command": ""
-		},
-		{
-			"commandType": "run",
-			"command": ""
-		},
-		{
-			"commandType": "clean",
-			"command": ""
-		}
-	]
+	"build": {
+		"command": ""
+	},
+	"buildCurrentFile": {
+		"command": "",
+		"extensions": ".c;.cpp"
+	},
+	"debug": {},
+	"run": {
+		"command": ""
+	},
+	"clean": {
+		"command": ""
+	}
 }
 ```
 
@@ -69,14 +61,39 @@ This will create MCB Optimization button in the status bar, which when clicked o
 
 In the build command configTypes must be inserted in the command starting with $mcb{ and ending with }$
 
+To be able to run debug command the user must fill out "debug", just if it is one of launch.json configurations. That means the user has to install one of the debugger extension. Basically, MCB constructs config for the debugger extension and launches it. Also it supports vscode variables like ${workspaceFolder}.
+
 Note that there is built in parameter currentFile. which is the path for active file relative to your worspace directory
 
 ```
-"buildCommands": [
-{
-	"commandType": "build",
-	"command": "clang++ $mcb{Optimization}$"
-}
+"build": {
+		"command": "./build/linux_build build $mcb{Project}$"
+	},
+	"buildCurrentFile": {
+		"command": "./build/linux_build buildCurrentFile $mcb{Project}$ $mcb{currentFile}$",
+		"extensions": ".c;.cpp"
+	},
+	"debug": {
+		"name": "mcb debug",
+		"type": "cppdbg",
+		"request": "launch",
+		"program": "${workspaceFolder}/binaries/bin/$mcb{Project}$",
+		"stopAtEntry": false,
+		"cwd": "${workspaceFolder}",
+		"setupCommands": [
+			{
+				"description": "Enable pretty-printing for gdb",
+				"text": "-enable-pretty-printing",
+				"ignoreFailures": false
+			}
+		]
+	},
+	"run": {
+		"command": "./build/linux_build build $mcb{Project}$ && ./build/linux_build run $mcb{Project}$"
+	},
+	"clean": {
+		"command": "./build/linux_build clean $mcb{Project}$"
+	}
 ```
 
 ## Requirements
@@ -105,8 +122,6 @@ By default MCB contributes following keybindings:
 * `multiConfigBuild.clean`:						 `ctrl+shift+f9`
 
 ## Known Issues
-
-Right now buildCurrentFile command works only with .c and .cpp file. As the extension was developed mainly for c/c++, it is not clear if this functionality has any uses in other languages. This can be fixed if there is any need.
 
 ## Release Notes
 
