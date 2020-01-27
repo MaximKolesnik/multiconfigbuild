@@ -60,7 +60,7 @@ export class BuildCurrentFileCommand
 		const filePath = vscode.window.activeTextEditor.document.fileName;
 		const extension = path.extname(filePath);
 
-		if (this._extensions.length != 0 && !this.isValidExtension(extension))
+		if (this._extensions.length == 0 || !this.isValidExtension(extension))
 		{
 			throw('Cannot compile files with extension ' + extension);
 		}
@@ -82,7 +82,7 @@ export class BuildCurrentFileCommand
 	private isValidExtension(ext: string)
 	{
 		var extList = this._extensions.split(';');
-		return extList.find((elem) => { elem == ext }) != undefined;
+		return extList.find(elem =>  elem == ext ) != undefined;
 	}
 
 	private _command: string;
